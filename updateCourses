@@ -1,0 +1,3 @@
+#!/bin/bash
+SHELL=/bin/bash
+env ENV=Development stack runghc src/Cron.hs

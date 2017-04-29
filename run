@@ -1,0 +1,4 @@
+#!/bin/bash
+SHELL=/bin/bash
+stack build
+env ENV=Development PORT=3000 PGHOST=ENGREj PGPORT=5432 PGUSER=dev PGPASS=local PGDATABASE=liucourses stack runghc app/Main
