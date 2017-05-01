@@ -31,6 +31,7 @@ import Config (Action, ConfigM, getPool)
 share [mkMigrate "migrateAll", mkPersist sqlSettings] [persistLowerCase|
 
 Course json
+  program Text
   term Text
   code Text
   name Text

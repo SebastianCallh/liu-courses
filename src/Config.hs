@@ -8,38 +8,28 @@ module Config(Config, Action, App, ConfigM,
 
 import           Data.Aeson (Value(..), object, (.=), encode)
 import           Data.Text.Internal.Lazy (Text)
-import qualified Data.Text.Lazy as T (pack)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as BS (pack, unpack)
 import           Data.Default (def)
-
 import           Text.Read (readEither)
-
 import           Control.Monad.Trans.Maybe
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Logger (runNoLoggingT, runStdoutLoggingT)
 import           Control.Monad.Reader (MonadReader, ReaderT,
                                        asks, runReaderT)
-
-import Network.Wai.Handler.Warp (Settings, defaultSettings,
-                                 setFdCacheDuration, setPort, Port)
-
+import           Network.Wai.Handler.Warp (Settings, defaultSettings,
+                                           setFdCacheDuration, setPort, Port)
 import           Database.Persist
 import           Database.Persist.Postgresql (createPostgresqlPool,
                                               ConnectionPool, ConnectionString)
-                 
 import           System.Environment (lookupEnv)
 import           Data.Monoid ((<>))
-
-import Web.Scotty.Trans (ActionT, Options, ScottyT, status,
-                         settings, verbose, json, showError)
-
-import Network.Wai.Middleware.RequestLogger (logStdout, logStdoutDev)
-
-import Network.HTTP.Types.Status (created201, internalServerError500,
-                                   notFound404)
-
-import Network.Wai (Middleware)
+import           Web.Scotty.Trans (ActionT, Options, ScottyT, status,
+                                   settings, verbose, json, showError)
+import           Network.Wai.Middleware.RequestLogger (logStdout, logStdoutDev)
+import           Network.HTTP.Types.Status (created201, internalServerError500,
+                                            notFound404)
+import           Network.Wai (Middleware)
 
 newtype ConfigM a = ConfigM { runConfigM :: ReaderT Config IO a }
   deriving (Functor, Applicative, Monad, MonadReader Config, MonadIO)

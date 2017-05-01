@@ -5,122 +5,87 @@ module Sh (fetchCourses) where
 
 import qualified Data.Text as T
 
-import Text.XML.HXT.Core
-import Text.HandsomeSoup
-import Control.Monad
-import Data.List.Split (chunksOf)
-import Data.List
-import Data.Text (Text, pack)
-import GHC.Generics
-import Data.Aeson (ToJSON, FromJSON)
-import Data.Time.Clock (UTCTime, getCurrentTime)
-import Models
+import           Text.XML.HXT.Core
+import           Text.HandsomeSoup
+import           Control.Monad
+import           Data.List.Split (chunksOf)
+import           Data.List
+import           Data.Text (Text, pack)
+import           Text.Printf
+import           GHC.Generics
+import           Data.Aeson (ToJSON, FromJSON)
+import           Data.Time.Clock (UTCTime, getCurrentTime)
+import           Control.Monad
+import           Data.Char
 
-{-
-data Level = G1 | G2 | A deriving (Show, Eq, Generic)
+import           Debug.Trace as D
 
-data Term = Ht17 | Ht27 | Vt18 | Vt28 | Ht19 | Ht29 deriving (Show, Eq, Generic)
+import           Models
 
-data Importance = V | O | F | OV deriving (Show, Eq, Generic)
+data Program = D | IT | U | M | DPU | EM | Y |
+               MED | KTS | MT | ED | I | Ii
+             deriving (Show, Read)
 
-data Block = One | Two | Three | Four | None deriving (Show, Eq, Generic)
+urlForProgram :: Program -> Int -> String
+urlForProgram prog year = printf url (show year) (show prog) (show prog) where
+  url = "http://kdb-5.liu.se/liu/lith/studiehandboken/action.lasso?&-response=lot_response.lasso&-op=eq&kp_budget_year=%s&-op=eq&kp_programkod=%s&-op=eq&kp_programprofil=%s&-op=gt&kp_termin=6" 
 
-data Course = Course { term :: Term
-                     , code :: Text
-                     , name :: Text
-                     , level :: Level
-                     , importance :: Importance
-                     , block :: Block
-                     , credits :: Int
-                     , wholeTerm :: Bool
-                     } deriving (Show, Eq, Generic)
-instance ToJSON Level
-instance ToJSON Term
-instance ToJSON Importance
-instance ToJSON Block
---instance ToJSON Course
 
-instance FromJSON Level
-instance FromJSON Term
-instance FromJSON Importance
-instance FromJSON Block
---instance FromJSON Course
--}
-
-coursesUrl = "http://kdb-5.liu.se/liu/lith/studiehandboken/action.lasso?&-response=lot_response.lasso&-op=eq&kp_budget_year=2017&-op=eq&kp_programkod=D&-op=eq&kp_programprofil=D&-op=gt&kp_termin=6"
+programs = [D, IT, U, M, DPU, EM, Y, MED, KTS, MT, I, Ii]
+year = 2017
 
 fetchCourses :: IO [Course]
-fetchCourses = do
+fetchCourses = fmap concat $ forM programs $ fetchProgramCourses year
+
+fetchProgramCourses :: Int -> Program -> IO [Course]
+fetchProgramCourses year program = do
   time <- getCurrentTime
-  let doc = fromUrl coursesUrl
+  let doc = fromUrl $ urlForProgram program year
   let sameCode = \a b -> courseCode a == courseCode b
-  let createCourses = nubBy sameCode . filterSuccessful . process time . filter (not . isTrash)
-  let nTrashRows = 165
-
+  let createCourses = nubBy sameCode .
+                      process time program .
+                      filter (not . isTrash)
+                      
   markup <- runX $ doc >>> css "td" //> getText
-  return . createCourses . drop nTrashRows $ markup
+  -- For some reason you get everything duplicated from runX
+  let courseMarkup =  dropWhile (/= "7Ht1") . tail . dropWhile (/= "7Ht1") $ markup
+  let courses = createCourses . filter (not .isTrash ) $ courseMarkup
+  print $ "Fetched " ++ (show $ length courses) ++ " courses for program " ++ show program
+  return courses
 
-process :: UTCTime ->  [String] -> [Either String Course]
-process time = doProcess ("", []) where
-  doProcess :: (String, [Either String Course]) -> [String] -> [Either String Course]
+process :: UTCTime ->  Program -> [String] -> [Course]
+process time program = doProcess ("", []) where
+  doProcess :: (String, [Course]) -> [String] -> [Course]
   doProcess (term, cs) [] = cs
+
+  
+  doProcess (term, cs) ("TFBI17":n:l:i:cr:rest) = doProcess (term, c : cs) $ rest where
+    c = mkCourse time program term ("TFBI17":n:l:i:"-":cr:[])
+    
+  -- TFBI17 has an empty td in the "block" column
   doProcess (term, cs) xs
     | isTerm $ head xs = doProcess (head xs, cs) $ tail xs
     | otherwise = doProcess (term, c : cs) $ drop nFields xs where
-        c = mkCourse time $ term : take nFields xs
+        c = mkCourse time program term $ take nFields xs
         nFields = 6
 
-filterSuccessful :: [Either String Course] -> [Course]
-filterSuccessful = foldr succesFullyFetched [] where
-  succesFullyFetched (Right c) cs = c : cs
-  succesFullyFetched (Left _) cs = cs
+mkCourse :: UTCTime -> Program -> String -> [String] -> Course--Either String Course
+mkCourse time program term (c:n:l:i:b:cr:[]) = do
+  Course { courseProgram = pack . show $ program
+         , courseTerm = pack term
+         , courseCode = pack c
+         , courseName = pack n
+         , courseLevel = pack l
+         , courseImportance = pack i
+         , courseBlock = pack b
+         , courseCredits = read $ filter isNumber cr
+         , courseWholeTerm = elem '*' cr
+         , courseCreated = time
+         }
 
-mkCourse :: UTCTime -> [String] -> Either String Course
-mkCourse time (t:c:n:l:i:b:cr:_) = Right Course { courseTerm = pack t
-                                                 , courseCode = pack c
-                                                 , courseName = pack n
-                                                 , courseLevel = pack l
-                                                 , courseImportance = pack i
-                                                 , courseBlock = pack b
-                                                 , courseCredits = 5--read $ filter (/='*') cr
-                                                 , courseWholeTerm = elem '*' cr
-                                                 , courseCreated = time
-                                                 }
+mkCourse _ _ term args =
+  error $ "Wrong amount of args when making course: " ++ term ++ " " ++ (show args)
 
-mkCourse _ args = Left $ "Wrong amount of args when making course: " ++ (show $ length args)
-
-{-
-mkTerm :: String -> Term
-mkTerm s
-  | s == "7Ht1" = Ht17
-  | s == "7Ht2" = Ht27
-  | s == "8Vt1" = Vt18
-  | s == "8Vt2" = Vt28
-  | s == "9Ht1" = Ht19
-  | s == "9Ht2" = Ht19
-
-mkLevel :: String -> Level
-mkLevel s
-  | s == "G1" = G1
-  | s == "G2" = G2
-  | s == "A" = A
-
-mkBlock :: String -> Block
-mkBlock s
-  | s == "1" = One
-  | s == "2" = Two
-  | s == "3" = Three
-  | s == "4" = Four
-  | s == "-" = None
-
-mkImportance :: String -> Importance
-mkImportance s
-  | s == "v" = V
-  | s == "o" = O
-  | s == "f" = F
-  | s == "o/v" = OV
-
--}
 isTerm :: String -> Bool
 isTerm = flip elem terms where
   terms = ["7Ht1",
@@ -132,7 +97,7 @@ isTerm = flip elem terms where
           ]
 
 isTrash :: String -> Bool
-isTrash xs = all isTrashChar xs where
+isTrash = all isTrashChar where
   isTrashChar = flip elem ['\t',
                            '\r',
                            '\n',
