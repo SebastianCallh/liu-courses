@@ -16,11 +16,13 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   exposed-modules:     LiuCourses
-                     , Models
                      , Config
                      , Sh
                      , Api.Course
+                     , Api.Program
                      , Api.Core
+                     , Db.Course
+                     , Db.Model
   build-depends:       base >= 4.7 && < 5
                      , aeson
                      , scotty

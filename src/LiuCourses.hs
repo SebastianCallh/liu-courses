@@ -5,29 +5,16 @@
 
 module LiuCourses (runApp, runMigrations) where
 
-import           Web.Scotty.Trans (ScottyT, ActionT, param, status, middleware,
-                                   scottyOptsT, scottyT, json, get, html,
-                                   defaultHandler, notFound, post)
-
-import           Data.Text (Text)
-import           Text.Read (readEither)
-
-import           Control.Monad.IO.Class (MonadIO, liftIO)
-
-
-import           Data.Aeson (Value (Null), (.=), object)
-
-import           Control.Monad.Reader (ReaderT, runReaderT)
-
-import           Database.Persist.Postgresql (Entity (..), (==.),
-                                     selectFirst, selectList,
-                                     runSqlPersistMPool, runMigration)
+import           Web.Scotty.Trans (middleware, scottyOptsT,
+                                   json, get, defaultHandler, notFound)
+import           Control.Monad.IO.Class (liftIO)
+import           Control.Monad.Reader (runReaderT)
+import           Database.Persist.Postgresql (runSqlPersistMPool, runMigration)
 
 import           Config 
-import           Models
+import           Db.Model
 import           Api.Course
 import           Api.Core
-
 
 app :: Config ->  App ()
 app config = do
@@ -35,16 +22,16 @@ app config = do
   middleware (getLogger env)
   defaultHandler (getHandler env)
   
-  get       "/courses"       getCourses
-  post      "/courses"       insertCourse
-  get       "/course/:code"  getCourse
-  notFound                   fourOhFour
+  get       "/courses"          getCourses
+  get       "/courses/:program" getCoursesByProgram
+  get       "/course/:code"     getCourse
+  notFound                      fourOhFour
 
 runApp :: Config -> IO ()
 runApp config = do
   environment <- getEnvironment
   options <- getOptions environment
-  let reader m = runReaderT (runConfigM m) config
+  let reader m = runReaderT (runConfig m) config
   scottyOptsT options reader $ app config
 
 runMigrations :: Config -> IO ()

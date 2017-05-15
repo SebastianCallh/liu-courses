@@ -12,21 +12,18 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module Models where
+module Db.Model where
 
-import Data.Text (Text)
-import Data.Time.Clock (UTCTime)
-import Data.Aeson (ToJSON, FromJSON)
+import           Data.Text (Text)
+import           Data.Time.Clock (UTCTime)
+import           Data.Aeson (ToJSON, FromJSON)
+import           Control.Monad.Reader
+import           GHC.Generics (Generic)
+import           Database.Persist.Sql
+import           Database.Persist.TH (mkMigrate, mkPersist, persistLowerCase,
+                                      share, sqlSettings)
 
-import Control.Monad.Reader
-
-import GHC.Generics (Generic)
-
-import Database.Persist.Sql
-import Database.Persist.TH (mkMigrate, mkPersist, persistLowerCase,
-                            share, sqlSettings)
-
-import Config (Action, ConfigM, getPool)
+import           Config (Action, WithConfig, getPool)
 
 share [mkMigrate "migrateAll", mkPersist sqlSettings] [persistLowerCase|
 
@@ -44,12 +41,11 @@ Course json
   deriving Show
 |]
 
+  
 doMigrations :: SqlPersistM ()
 doMigrations = runMigration migrateAll
 
-runDb :: (MonadTrans t, MonadIO (t ConfigM)) =>  SqlPersistT IO a -> t ConfigM a
+runDb :: SqlPersistT IO a -> WithConfig a
 runDb query = do
-  pool <- lift (asks getPool)
+  pool <- asks getPool
   liftIO $ runSqlPool query pool
-
-

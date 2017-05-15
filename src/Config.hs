@@ -1,10 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module Config(Config, Action, App, ConfigM,
+module Config(Config, Action, App, WithConfig,
               getEnv, getPool, getLogger, getHandler,
               getEnvironment, getOptions, getConfig,
-              runConfigM) where
+              runConfig) where
 
 import           Data.Aeson (Value(..), object, (.=), encode)
 import           Data.Text.Internal.Lazy (Text)
@@ -31,11 +31,11 @@ import           Network.HTTP.Types.Status (created201, internalServerError500,
                                             notFound404)
 import           Network.Wai (Middleware)
 
-newtype ConfigM a = ConfigM { runConfigM :: ReaderT Config IO a }
+newtype WithConfig a = WithConfig { runConfig :: ReaderT Config IO a }
   deriving (Functor, Applicative, Monad, MonadReader Config, MonadIO)
 
-type App = ScottyT Text ConfigM
-type Action = ActionT Text ConfigM
+type App = ScottyT Text WithConfig
+type Action = ActionT Text WithConfig
 type Error = Text
 
 

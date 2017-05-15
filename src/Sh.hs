@@ -20,18 +20,13 @@ import           Data.Char
 
 import           Debug.Trace as D
 
-import           Models
-
-data Program = D | IT | U | M | DPU | EM | Y |
-               MED | KTS | MT | ED | I | Ii
-             deriving (Show, Read)
+import           Db.Model
+import           Api.Program (programs, Program)
 
 urlForProgram :: Program -> Int -> String
 urlForProgram prog year = printf url (show year) (show prog) (show prog) where
   url = "http://kdb-5.liu.se/liu/lith/studiehandboken/action.lasso?&-response=lot_response.lasso&-op=eq&kp_budget_year=%s&-op=eq&kp_programkod=%s&-op=eq&kp_programprofil=%s&-op=gt&kp_termin=6" 
 
-
-programs = [D, IT, U, M, DPU, EM, Y, MED, KTS, MT, I, Ii]
 year = 2017
 
 fetchCourses :: IO [Course]
@@ -47,6 +42,7 @@ fetchProgramCourses year program = do
                       filter (not . isTrash)
                       
   markup <- runX $ doc >>> css "td" //> getText
+
   -- For some reason you get everything duplicated from runX
   let courseMarkup =  dropWhile (/= "7Ht1") . tail . dropWhile (/= "7Ht1") $ markup
   let courses = createCourses . filter (not .isTrash ) $ courseMarkup
